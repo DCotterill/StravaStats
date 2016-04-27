@@ -1,2 +1,4 @@
 strava_access_token.string
-.idea
+strava_client_secret.string
+strava_client_code.string
+.idea/

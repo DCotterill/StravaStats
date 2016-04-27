@@ -12,18 +12,20 @@ from oauth import oauth
 
 ACCESS_TOKEN_STRING_FNAME = 'access_token.string'
 STRAVA_ACCESS_TOKEN_STRING_FNAME = 'strava_access_token.string'
-DEBUG = False
+STRAVA_CLIENT_SECRET_STRING_FNAME = 'strava_client_secret.string'
+STRAVA_CLIENT_CODE_STRING_NAME = 'strava_client_code.string'
 
 # pass oauth request to server (use httplib.connection passed in as param)
 # return response as a string
-def fetch_response(oauth_request, connection, debug=DEBUG):
+def fetch_response(oauth_request, connection, debug=False):
    url= oauth_request.to_url()
    connection.request(oauth_request.http_method,url)
    response = connection.getresponse()
    s=response.read()
-   if debug:
-      print 'requested URL: %s' % url
-      print 'server response: %s' % s
+
+   # print 'requested URL: %s' % url
+   # print 'server response: %s' % s
+
    return s
 
 def get_login_token():
@@ -36,19 +38,26 @@ def get_login_token():
         strava_client = Client()
         # auth_url = strava_client.authorization_url(client_id='601', redirect_uri='http://127.0.0.1:5000/authorisation')
 
-        auth_token = strava_client.exchange_code_for_token(client_id='601', client_secret='600580e02b4814c75c93d3a60e15077147895776', code = '74cc257e6bc370d9da44cabc8852f3667ad95515')
+        client_secret = open(STRAVA_CLIENT_SECRET_STRING_FNAME).read().strip()
+        print client_secret
+        client_code = open(STRAVA_CLIENT_CODE_STRING_NAME).read().strip()
+        print client_code
+
+        auth_token = strava_client.exchange_code_for_token(client_id='601',
+                                                           client_secret= client_secret,
+                                                           code = client_code)
 
         print auth_token
 
-        fobj = open(STRAVA_ACCESS_TOKEN_STRING_FNAME, 'w')
-        fobj.write(auth_token)
+        f = open(STRAVA_ACCESS_TOKEN_STRING_FNAME, 'w')
+        f.write(auth_token)
 
     else:
         print '* Reading request token from file ...'
-        fobj = open(STRAVA_ACCESS_TOKEN_STRING_FNAME)
-        auth_token = fobj.read()
+        f = open(STRAVA_ACCESS_TOKEN_STRING_FNAME)
+        auth_token = f.read()
 
-    fobj.close()
+    f.close()
 
     print auth_token
     return auth_token

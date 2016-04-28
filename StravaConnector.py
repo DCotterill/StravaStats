@@ -63,18 +63,17 @@ def get_login_token():
     return auth_token
 
 
-def get_activities_from_strava():
-    auth_token = get_login_token()
-    #access_token = oauth.OAuthToken.from_string(access_token_string)
+def get_activities_from_strava(strava_client):
 
-    strava_client = Client(access_token=auth_token)
     start_date = datetime.datetime(2016, 01, 01, 0, 0)
     activities = strava_client.get_activities(after=start_date)
 
     print "Activities.."
     print activities
 
-    elevation_per_week = {}
+    return activities
+
+def calculate_elevation(activities, strava_client):
     elevation_per_week_array = [0] * 54
 
     activitiesfile = open('activities.csv', 'w')
@@ -82,23 +81,13 @@ def get_activities_from_strava():
 
 
     for activity in activities:
-        print activity
         details = strava_client.get_activity(activity_id=activity.id)
-        print details
         csvLine =  str(details.start_date_local) + "," + str(details.distance) \
                 + "," + str(details.total_elevation_gain) + "," + str(details.elapsed_time)
         activitieswriter.writerow([details.start_date_local.strftime("%x"), str(details.distance)[0:-1], str(details.total_elevation_gain)[0:-1],
                                   details.elapsed_time.seconds])
 
         print csvLine
-        # print details.name
-        # print unithelper.kilometers(details.distance)
-        # print details.start_date_local
-        # print details.elapsed_time
-        # print details.calories
-        # print details.type
-        # print details.total_elevation_gain
-        # print "------"
 
         date = details.start_date_local
         week = int(date.isocalendar()[1])
@@ -111,15 +100,6 @@ def get_activities_from_strava():
         except IndexError:
             elevation_per_week_array[int(week)] = int(elevation)
 
-        # current_elevation = elevation_per_week.get(str(week), 0)
-
-        # elevation_per_week[str(week)] = current_elevation + int(elevation)
-        # print str(week) + ":" + str(elevation) + "," + str(elevation_per_week[str(week)])
-
-
-
-        b = open('elevation.csv', 'w')
-        a = csv.writer(b)
 
     cum_elevation_per_week_array = [0] * 52
     goal_elevation_per_week = [42200]
@@ -146,6 +126,9 @@ def get_activities_from_strava():
     goal_elevation_per_week.append(estimated_total)
     goal_elevation_per_week.append(0)
 
+    return goal_elevation_per_week
+
+def plot_graph(goal_elevation_per_week, last_week):
     weeks_axis = range(0,last_week) + [52,52]
     print len(weeks_axis)
     print len(goal_elevation_per_week)
@@ -157,7 +140,6 @@ def get_activities_from_strava():
 
     b.close()
 
-    return strava_client.get_activity(activity_id=activity.id)
 
 def main():
     # weeks_axis = range(0,5) + [52]
@@ -166,7 +148,10 @@ def main():
     # print len(value_axis)
     # plt.plot(np.array(weeks_axis), np.array(value_axis))
     # plt.show()
-    last_activity = get_activities_from_strava()
+    strava_client = Client(access_token=get_login_token())
+    activities = get_activities_from_strava(strava_client)
+    goal_elevation_per_week = calculate_elevation(activities, strava_client)
+    plot_graph(goal_elevation_per_week, 16)
 
 if __name__ == '__main__':
    main()

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import os, httplib, urllib
 import csv
-import datetime
+from datetime import datetime
 from stravalib import Client
 from stravalib.model import Activity
 import matplotlib.pyplot as plt
@@ -65,7 +65,7 @@ def get_login_token():
 
 def get_activities_from_strava(strava_client):
 
-    start_date = datetime.datetime(2016, 01, 01, 0, 0)
+    start_date = datetime(2016, 01, 01, 0, 0)
     activities = strava_client.get_activities(after=start_date)
 
     print "Activities.."
@@ -76,70 +76,114 @@ def get_activities_from_strava(strava_client):
 def calculate_elevation(activities, strava_client):
     elevation_per_week_array = [0] * 54
 
-    activitiesfile = open('activities.csv', 'w')
+    existingActivities = {}
+    try:
+        activitiesfile = open('activities.csv', 'r')
+        activitiesreader = csv.reader(activitiesfile)
+
+        for line in activitiesreader:
+            print "Ha:" + str(line[0])
+            existingActivities[line[0]] = {"date":line[1],
+                                           "distance":line[2],
+                                           "elevation":line[3],
+                                           "time":line[4]}
+
+        activitiesfile.close()
+    except IOError:
+        #Don't worry if the file doesn't exist, it'll be created next
+        print "sweet nothing"
+
+    activitiesfile = open('activities.csv', 'ab+')
     activitieswriter = csv.writer(activitiesfile)
 
 
     for activity in activities:
-        details = strava_client.get_activity(activity_id=activity.id)
-        csvLine =  str(details.start_date_local) + "," + str(details.distance) \
-                + "," + str(details.total_elevation_gain) + "," + str(details.elapsed_time)
-        activitieswriter.writerow([details.start_date_local.strftime("%x"), str(details.distance)[0:-1], str(details.total_elevation_gain)[0:-1],
-                                  details.elapsed_time.seconds])
-
-        print csvLine
-
-        date = details.start_date_local
-        week = int(date.isocalendar()[1])
-        print str(week) + "," + str(details.total_elevation_gain)
-
-        elevation = details.total_elevation_gain
-        print week
         try:
-            elevation_per_week_array[week] = elevation_per_week_array[week] + int(elevation)
+            print "--- Existing activity:" + str(activity.id)
+            existingActivities[str(activity.id)]
+        except KeyError:
+            print "--- Adding new activity:" + str(activity.id)
+            details = strava_client.get_activity(activity_id=activity.id)
+            csvLine = [str(activity.id), details.start_date_local.strftime("%x"), str(details.distance)[0:-2], str(details.total_elevation_gain)[0:-2],
+                                      details.elapsed_time.seconds]
+            print csvLine
+            activitieswriter.writerow(csvLine)
+
+            existingActivities[str(activity.id)] = {"date":details.start_date_local.strftime("%x"),
+                                            "distance":str(details.distance)[0:-2],
+                                            "elevation":str(details.total_elevation_gain)[0:-2],
+                                            "time":str(details.elapsed_time.seconds)}
+    activitiesfile.close()
+
+    for key, activity in existingActivities.iteritems():
+        date = datetime.strptime(activity['date'],'%x')
+        week = int(date.isocalendar()[1])
+        print str(week) + "," + activity['elevation']
+
+        try:
+            elevation_per_week_array[week] = elevation_per_week_array[week] + int(activity['elevation'][0:-3])
         except IndexError:
-            elevation_per_week_array[int(week)] = int(elevation)
+            elevation_per_week_array[int(week)] = int(activity['elevation'][0:-3])
 
 
-    cum_elevation_per_week_array = [0] * 52
-    goal_elevation_per_week = [42200]
-    last_week = 0
+        cum_elevation_per_week_array = [0] * 52
+        goal_elevation_per_week = [42200]
+        last_week = 0
 
-    for i in range (0, 52):
-        if (elevation_per_week_array[i] > 0):
-            last_week = i
-        if (i > 0):
-            cum_elevation_per_week_array[i] = cum_elevation_per_week_array[i-1] + elevation_per_week_array[i]
-        else:
-            cum_elevation_per_week_array[i] = elevation_per_week_array[i]
+        for i in range (0, 52):
+            if (elevation_per_week_array[i] > 0):
+                last_week = i + 1
+            if (i > 0):
+                cum_elevation_per_week_array[i] = cum_elevation_per_week_array[i-1] + elevation_per_week_array[i]
+            else:
+                cum_elevation_per_week_array[i] = elevation_per_week_array[i]
 
-    print "last_week:" + str(last_week)
-    for i in range (1,last_week):
-        goal_elevation_per_week.append (42200 - cum_elevation_per_week_array[i])
+        print "last_week:" + str(last_week)
+        for i in range (1,last_week):
+            goal_elevation_per_week.append (42200 - cum_elevation_per_week_array[i])
 
-    for i in range(0,len(goal_elevation_per_week)):
-        print str(i) + ":" + str(goal_elevation_per_week[i])
+        for i in range(0,len(goal_elevation_per_week)):
+            print str(i) + ":" + str(goal_elevation_per_week[i])
 
-    average_per_week = (42200 - goal_elevation_per_week[last_week-1]) / last_week
-    estimated_total = goal_elevation_per_week[last_week-1] - (average_per_week * (52-last_week))
-
-    goal_elevation_per_week.append(estimated_total)
-    goal_elevation_per_week.append(0)
 
     return goal_elevation_per_week
 
-def plot_graph(goal_elevation_per_week, last_week):
-    weeks_axis = range(0,last_week) + [52,52]
+# def plot_graph(goal_elevation_per_week, last_week):
+#     weeks_axis = range(0,len(goal_elevation_per_week) - 1) + [52]
+#     print len(weeks_axis)
+#     print len(goal_elevation_per_week)
+#     plt.ylim([0,42200])
+#     plt.xlim([0,52])
+#
+#     plt.plot(np.array(weeks_axis), np.array(goal_elevation_per_week))
+#     plt.show()
+
+def plot_graph(goal_elevation_per_week):
+    weeks_axis = range(0,len(goal_elevation_per_week))
+    print "---"
+    print weeks_axis
+    print "---"
+    print goal_elevation_per_week
+    print "---"
     print len(weeks_axis)
     print len(goal_elevation_per_week)
     plt.ylim([0,42200])
     plt.xlim([0,52])
 
-    plt.plot(np.array(weeks_axis), np.array(goal_elevation_per_week))
+    plt.plot(np.array(goal_elevation_per_week))
+
+    last_week = len(goal_elevation_per_week)
+    average_per_week = (42200 - goal_elevation_per_week[last_week-1]) / last_week
+    estimated_total = goal_elevation_per_week[last_week-1] - (average_per_week * (52-last_week))
+
+    x = [last_week - 1, 52]
+    y = [goal_elevation_per_week[-1],estimated_total]
+    plt.plot(x, y, linestyle="dashed", color="green")
+    # goal_elevation_per_week.append(estimated_total)
+    # goal_elevation_per_week.append(0)
+
+
     plt.show()
-
-    b.close()
-
 
 def main():
     # weeks_axis = range(0,5) + [52]
@@ -151,7 +195,7 @@ def main():
     strava_client = Client(access_token=get_login_token())
     activities = get_activities_from_strava(strava_client)
     goal_elevation_per_week = calculate_elevation(activities, strava_client)
-    plot_graph(goal_elevation_per_week, 16)
+    plot_graph(goal_elevation_per_week)
 
 if __name__ == '__main__':
    main()

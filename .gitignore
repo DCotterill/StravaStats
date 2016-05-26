@@ -2,4 +2,5 @@ strava_client_secret.string
 strava_client_code.string
 .idea/
 activities.csv
+*.pyc
 
